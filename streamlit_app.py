@@ -62,55 +62,7 @@ if csv_file:
     df = pd.read_csv(io.BytesIO(csv_file.read()), encoding='utf-8')
     st.write(df.head())  # Debug statement to check the loaded data
 
-    if "Branch" not in df.columns:
-        # Assuming the new dataset structure without a 'Branch' column
-        review_columns = df.columns[1::2]  # Adjust column selection to match the provided dataset structure
-        reviews = df[review_columns].values.flatten().tolist()
-
-        analyzer = SentimentAnalyzer()
-
-        review_period = st.selectbox("Review Period:", [1, 4])
-
-        if review_period == 1:
-            sentiments = analyzer.analyze_sentiment(reviews)
-        else:
-            sentiments = analyzer.analyze_periodic_sentiment(reviews, review_period)
-
-        overall_sentiment = analyzer.calculate_overall_sentiment(reviews)
-        st.subheader(f"Overall Sentiment: {overall_sentiment:.2f}")
-        st.subheader("Sentiment Analysis")
-
-        # Plotting sentiment
-        weeks = list(range(1, len(sentiments) + 1))
-        sentiment_scores = [sentiment['compound'] for sentiment in sentiments]
-        pos_scores = [sentiment['pos'] for sentiment in sentiments]
-        neu_scores = [sentiment['neu'] for sentiment in sentiments]
-        neg_scores = [sentiment['neg'] for sentiment in sentiments]
-
-        fig, ax = plt.subplots()
-        ax.plot(weeks, sentiment_scores, label="Overall", color="blue")
-        ax.fill_between(weeks, sentiment_scores, color="blue", alpha=0.1)
-        ax.plot(weeks, pos_scores, label="Positive", color="green")
-        ax.plot(weeks, neu_scores, label="Neutral", color="gray")
-        ax.plot(weeks, neg_scores, label="Negative", color="red")
-
-        ax.set_xlabel('Week')
-        ax.set_ylabel('Sentiment Score')
-        ax.set_title('Sentiment Analysis')
-        ax.legend()
-        st.pyplot(fig)
-
-        description, trend = analyzer.interpret_sentiment(sentiments)
-        st.subheader("Progress Description")
-        st.write(f"Sentiment Trend: {trend}")
-        st.write(f"Description: {description}")
-
-        # Breakdown of analysis
-        st.subheader("Breakdown of Analysis")
-        breakdown_df = pd.DataFrame(sentiments, index=list(range(1, len(sentiments) + 1)))
-        st.write(breakdown_df)
-
-    else:
+    if "Branch" in df.columns:
         # Existing logic for handling dataset with 'Branch' column
         branches = df["Branch"].unique().tolist()
         selected_branch = st.selectbox("Select a Branch:", ["All Branches"] + branches)
@@ -198,3 +150,140 @@ if csv_file:
                 file_name='branches_sentiment_analysis.csv',
                 mime='text/csv',
             )
+        
+    elif "Student" in df.columns:
+        student_names = df["Student"].unique().tolist()
+        selected_student = st.selectbox("Select a Student:", ["All Students"] + student_names)
+        review_period = st.selectbox("Review Period:", [1, 4])
+    
+        if selected_student != "All Students":
+            # Processing for individual student
+            student_data = df[df["Student"] == selected_student]
+            st.write(student_data)  # Debug statement to check the student_data
+            reviews = student_data.iloc[:, 1:].values.flatten().tolist()  # Assuming feedback starts from column index 1
+    
+            analyzer = SentimentAnalyzer()
+    
+            if review_period == 1:
+                sentiments = analyzer.analyze_sentiment(reviews)
+            else:
+                sentiments = analyzer.analyze_periodic_sentiment(reviews, review_period)
+    
+            overall_sentiment = analyzer.calculate_overall_sentiment(reviews)
+            st.subheader(f"Overall Sentiment for {selected_student}: {overall_sentiment:.2f}")
+            st.subheader("Sentiment Analysis")
+    
+            # Plotting sentiment
+            weeks = list(range(1, len(sentiments) + 1))
+            sentiment_scores = [sentiment['compound'] for sentiment in sentiments]
+            pos_scores = [sentiment['pos'] for sentiment in sentiments]
+            neu_scores = [sentiment['neu'] for sentiment in sentiments]
+            neg_scores = [sentiment['neg'] for sentiment in sentiments]
+    
+            fig, ax = plt.subplots()
+            ax.plot(weeks, sentiment_scores, label="Overall", color="blue")
+            ax.fill_between(weeks, sentiment_scores, color="blue", alpha=0.1)
+            ax.plot(weeks, pos_scores, label="Positive", color="green")
+            ax.plot(weeks, neu_scores, label="Neutral", color="gray")
+            ax.plot(weeks, neg_scores, label="Negative", color="red")
+    
+            ax.set_xlabel('Week')
+            ax.set_ylabel('Sentiment Score')
+            ax.set_title(f'Sentiment Analysis for {selected_student}')
+            ax.legend()
+            st.pyplot(fig)
+    
+            description, trend = analyzer.interpret_sentiment(sentiments)
+            st.subheader("Progress Description")
+            st.write(f"Sentiment Trend: {trend}")
+            st.write(f"Description: {description}")
+    
+            # Breakdown of analysis
+            st.subheader("Breakdown of Analysis")
+            breakdown_df = pd.DataFrame(sentiments, index=list(range(1, len(sentiments) + 1)))
+            st.write(breakdown_df)
+    
+        else:
+            # Processing for all students
+            analyzer = SentimentAnalyzer()
+            all_students_data = []
+    
+            for student in student_names:
+                student_reviews = df[df["Student"] == student].iloc[:, 1:].values.flatten().tolist()  # Assuming feedback starts from column index 1
+                overall_sentiment = analyzer.calculate_overall_sentiment(student_reviews)
+                description, trend = analyzer.interpret_sentiment(analyzer.analyze_sentiment(student_reviews))
+                
+                student_data = {
+                    "Student": student,
+                    "Overall Sentiment": overall_sentiment,
+                    "Sentiment Description": description,
+                    "Sentiment Trend": trend
+                }
+                all_students_data.append(student_data)
+    
+            all_students_df = pd.DataFrame(all_students_data)
+            st.subheader("All Students Sentiment Analysis")
+            st.write(all_students_df)
+    
+            # Function to convert DataFrame to CSV (for download)
+            def convert_df_to_csv(df):
+                return df.to_csv(index=False).encode('utf-8')
+    
+            csv_data = convert_df_to_csv(all_students_df)
+    
+            # Download button
+            st.download_button(
+                label="Download data as CSV",
+                data=csv_data,
+                file_name='students_sentiment_analysis.csv',
+                mime='text/csv',
+            )
+
+    else:
+        # Assuming the new dataset structure without a 'Branch' column
+        review_columns = df.columns[1::2]  # Adjust column selection to match the provided dataset structure
+        reviews = df[review_columns].values.flatten().tolist()
+
+        analyzer = SentimentAnalyzer()
+
+        review_period = st.selectbox("Review Period:", [1, 4])
+
+        if review_period == 1:
+            sentiments = analyzer.analyze_sentiment(reviews)
+        else:
+            sentiments = analyzer.analyze_periodic_sentiment(reviews, review_period)
+
+        overall_sentiment = analyzer.calculate_overall_sentiment(reviews)
+        st.subheader(f"Overall Sentiment: {overall_sentiment:.2f}")
+        st.subheader("Sentiment Analysis")
+
+        # Plotting sentiment
+        weeks = list(range(1, len(sentiments) + 1))
+        sentiment_scores = [sentiment['compound'] for sentiment in sentiments]
+        pos_scores = [sentiment['pos'] for sentiment in sentiments]
+        neu_scores = [sentiment['neu'] for sentiment in sentiments]
+        neg_scores = [sentiment['neg'] for sentiment in sentiments]
+
+        fig, ax = plt.subplots()
+        ax.plot(weeks, sentiment_scores, label="Overall", color="blue")
+        ax.fill_between(weeks, sentiment_scores, color="blue", alpha=0.1)
+        ax.plot(weeks, pos_scores, label="Positive", color="green")
+        ax.plot(weeks, neu_scores, label="Neutral", color="gray")
+        ax.plot(weeks, neg_scores, label="Negative", color="red")
+
+        ax.set_xlabel('Week')
+        ax.set_ylabel('Sentiment Score')
+        ax.set_title('Sentiment Analysis')
+        ax.legend()
+        st.pyplot(fig)
+
+        description, trend = analyzer.interpret_sentiment(sentiments)
+        st.subheader("Progress Description")
+        st.write(f"Sentiment Trend: {trend}")
+        st.write(f"Description: {description}")
+
+        # Breakdown of analysis
+        st.subheader("Breakdown of Analysis")
+        breakdown_df = pd.DataFrame(sentiments, index=list(range(1, len(sentiments) + 1)))
+        st.write(breakdown_df)
+        
